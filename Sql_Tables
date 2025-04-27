@@ -1,86 +1,105 @@
 CREATE DATABASE IF NOT EXISTS course_management;
 
-
-CREATE TABLE admin
+-- Single User Table
+CREATE TABLE user
 (
     user_id  INT PRIMARY KEY,
-    name     VARCHAR(100)        NOT NULL,
+    name     VARCHAR(100) NOT NULL,
     email    VARCHAR(100) UNIQUE NOT NULL,
-    password VARCHAR(100)
+    password VARCHAR(100) NOT NULL,
+    role     ENUM('admin', 'lecturer', 'student') NOT NULL
 );
 
-CREATE TABLE lecturer
-(
-    lecturer_id INT PRIMARY KEY,
-    name        VARCHAR(100)        NOT NULL,
-    email       VARCHAR(100) UNIQUE NOT NULL,
-    password    VARCHAR(100)
-);
-
-
-CREATE TABLE student
+-- Student Profile Table (only for students)
+CREATE TABLE student_profile
 (
     student_id INT PRIMARY KEY,
-    name       VARCHAR(100)        NOT NULL,
-    email      VARCHAR(100) UNIQUE NOT NULL,
-    password   VARCHAR(100),
-    gpa        decimal
+    gpa        DECIMAL(3,2),
+    FOREIGN KEY (student_id) REFERENCES user(user_id)
 );
 
+-- Courses
 CREATE TABLE course
 (
     course_id       INT PRIMARY KEY,
     name            VARCHAR(100) NOT NULL,
-    course_code     int,
-    lecturer_id     INT,
-    FOREIGN KEY (lecturer_id) REFERENCES lecturer (lecturer_id),
-    department_name VARCHAR(100)
+    course_code     VARCHAR(10),
+    department_name VARCHAR(100),
+    lecturer_id     INT, -- Lecturer assigned to course
+    FOREIGN KEY (lecturer_id) REFERENCES user(user_id)
 );
 
-# Each course can have more than one fora.
-# Each forum can belong to one and only one course
+-- Student - Course Many-to-Many
+CREATE TABLE student_course
+(
+    student_id INT,
+    course_id  INT,
+    PRIMARY KEY (student_id, course_id),
+    FOREIGN KEY (student_id) REFERENCES user(user_id),
+    FOREIGN KEY (course_id) REFERENCES course(course_id)
+);
+
+-- Calendar Events
+CREATE TABLE calendar_event
+(
+    event_id    INT PRIMARY KEY,
+    course_id   INT,
+    title       VARCHAR(100),
+    event_date  DATE,
+    description TEXT,
+    FOREIGN KEY (course_id) REFERENCES course(course_id)
+);
+
+-- Forums (Per Course)
 CREATE TABLE forum
 (
     forum_id  INT PRIMARY KEY,
     name      VARCHAR(100),
     course_id INT,
-    FOREIGN KEY (course_id) REFERENCES course (course_id)
+    FOREIGN KEY (course_id) REFERENCES course(course_id)
 );
 
-# Each forum can have more than one posts
-# A post in a forum has to be made by a lecturer
+-- Forum Posts (Discussion Threads)
 CREATE TABLE forum_post
 (
-    post_id   INT PRIMARY KEY,
+    post_id     INT PRIMARY KEY,
     title       VARCHAR(100),
     post        TEXT,
-    lecturer_id INT,
-
-    # Lecturer creates forum post
-    FOREIGN KEY (lecturer_id) REFERENCES lecturer (lecturer_id),
-
-    # Each forum post can belong to one and only one forum.
+    user_id     INT,
     forum_id    INT,
-    FOREIGN KEY (forum_id) REFERENCES forum (forum_id)
-
-
+    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(user_id),
+    FOREIGN KEY (forum_id) REFERENCES forum(forum_id)
 );
 
+-- Replies (Nested Replies Support)
 CREATE TABLE reply
 (
-    reply_id      INT PRIMARY KEY,
-    reply_content TEXT,
-
-    # The student who made the reply
-    student_id INT,
-    FOREIGN KEY (student_id) REFERENCES student(student_id),
-
-    # They post to which the reply is being made
-    post_id INT,
-    FOREIGN KEY (post_id) REFERENCES forum_post(post_id)
-
+    reply_id        INT PRIMARY KEY,
+    reply_content   TEXT NOT NULL,
+    user_id         INT,
+    post_id         INT,
+    parent_reply_id INT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES user(user_id),
+    FOREIGN KEY (post_id) REFERENCES forum_post(post_id),
+    FOREIGN KEY (parent_reply_id) REFERENCES reply(reply_id)
 );
 
+-- Course Content (Organized by Sections)
+CREATE TABLE course_content
+(
+    content_id  INT PRIMARY KEY,
+    course_id   INT,
+    section     VARCHAR(100),
+    title       VARCHAR(100),
+    link        VARCHAR(255),
+    file        BLOB,
+    description TEXT,
+    FOREIGN KEY (course_id) REFERENCES course(course_id)
+);
+
+-- Assignments
 CREATE TABLE assignment
 (
     assignment_id INT PRIMARY KEY,
@@ -89,27 +108,26 @@ CREATE TABLE assignment
     FOREIGN KEY (course_id) REFERENCES course(course_id)
 );
 
-# This represents a piece of resource the lecturer may upload for a course
+-- Student Submissions for Assignments
+CREATE TABLE assignment_submission
+(
+    submission_id   INT PRIMARY KEY,
+    assignment_id   INT,
+    student_id      INT,
+    submitted_file  BLOB,
+    submission_date DATETIME DEFAULT CURRENT_TIMESTAMP,
+    grade           DECIMAL(5,2),
+    FOREIGN KEY (assignment_id) REFERENCES assignment(assignment_id),
+    FOREIGN KEY (student_id) REFERENCES user(user_id)
+);
+
+-- Optional: Store Lecturer-Uploaded Resources (PDFs, Videos)
 CREATE TABLE course_resource
 (
     resource_id INT PRIMARY KEY,
-    name        VARCHAR(100),
-
-    # Represent the content being stored such as video, PDF, etc
-    content     BLOB,
     course_id   INT,
-    FOREIGN KEY (course_id) REFERENCES course (course_id)
+    name        VARCHAR(100),
+    content     BLOB,
+    FOREIGN KEY (course_id) REFERENCES course(course_id)
 );
 
-
-# JOIN table for many-to-many relationship between students and courses
-CREATE TABLE student_course
-(
-    PRIMARY KEY (student_id, course_id),
-    course_id  int,
-    FOREIGN KEY (course_id) REFERENCES course (course_id),
-
-    student_id INT,
-    FOREIGN KEY (student_id) REFERENCES student (student_id)
-
-)
