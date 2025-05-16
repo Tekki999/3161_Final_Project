@@ -7,7 +7,7 @@ from datetime import datetime
 from mysql.connector import Error
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'your-secret-key-here'  # Change in production!
+app.config['SECRET_KEY'] = 'your-secret-key-here'  
 app.config['UPLOAD_FOLDER'] = 'uploads'
 jwt = JWTManager(app)
 
